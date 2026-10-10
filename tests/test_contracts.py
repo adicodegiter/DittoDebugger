@@ -36,7 +36,12 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(set(telemetry["ditto"]["metrics_targets"]), {"gateway", "policies", "things", "things-search", "connectivity"})
 
     def test_all_yaml_files_parse(self):
-        yaml_files = [*ROOT.glob("**/*.yaml"), *ROOT.glob("**/*.yml")]
+        # Skip ignored third-party/runtime trees (upstream Ditto checkout contains Helm templates).
+        skipped = {"vendor", ".local", "data", ".venv", "venv", "node_modules", ".git"}
+        yaml_files = [
+            path for path in [*ROOT.glob("**/*.yaml"), *ROOT.glob("**/*.yml")]
+            if not skipped.intersection(path.relative_to(ROOT).parts)
+        ]
         self.assertGreaterEqual(len(yaml_files), 6)
         for path in yaml_files:
             with self.subTest(path=path.relative_to(ROOT)):

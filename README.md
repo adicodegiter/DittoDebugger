@@ -35,8 +35,12 @@ The upstream Ditto module paths and the custom workbench code map are in [Ditto 
 - Verified upstream target: [eclipse-ditto/ditto](https://github.com/eclipse-ditto/ditto), release `3.9.8` as checked on 2026-10-10.
 - Local Ditto startup, benchmark dependencies, health/metrics endpoints, license, and architectural boundaries are documented in [Ditto integration](docs/ditto-integration.md).
 - JSON Schemas and examples define shared data contracts in [schemas](schemas/); Compose and Kubernetes discovery, Prometheus normalization, local SQLite baseline history, deterministic ranking, FastAPI routes, and the local dashboard are implemented.
-- The Docker chaos runner, live Ditto/Prometheus preflight, diagnosis agent, and public repository are not verified/available yet. The execute endpoint returns `503` by design. No root Compose file is included because this environment has no Docker and the target itself is a separate upstream deployment.
-- No GitHub remote has been created, and nothing has been published.
+- **M0 (Ditto runtime) verified 2026-10-10** on Docker Desktop (Windows 11, 7.6 GiB for Docker). The stack runs with the image pins from `deploy/image-pins.env`, all 5 Ditto services report healthy, and the API answers on `127.0.0.1:8080`. `simulator/smoke_test.py` passes 5/5, which confirms on the live stack:
+  - the Ditto v2 API paths (`/api/2/policies`, `/api/2/things`, `/api/2/search/things`)
+  - the policy body with the `nginx:ditto` subject
+  - the `mongo:7.0.14` tag
+- The Docker chaos runner is implemented as an opt-in local process with fixed Compose actions, approval, cleanup, recovery, kill-switch, and audit gates. The execute endpoint returns `503` unless `CHAOS_EXECUTION_ENABLED=true` is explicitly set on the operator machine.
+- Team repository: https://github.com/adicodegiter/ditto-debugger
 
 ## Prerequisites
 
@@ -46,20 +50,54 @@ The upstream Ditto module paths and the custom workbench code map are in [Ditto 
 
 ## Local Setup
 
-Create an isolated upstream checkout. It is ignored by this repository and pinned to the release inspected for this blueprint:
+### Run the target: Eclipse Ditto 3.9.8 (`deploy/ditto/`)
 
-```powershell
-New-Item -ItemType Directory -Force .local | Out-Null
-git clone --branch 3.9.8 --depth 1 https://github.com/eclipse-ditto/ditto.git .local/ditto-upstream
-Set-Content .local/ditto-runtime.env 'DITTO_VERSION=3.9.8'
-docker compose --project-directory .local/ditto-upstream/deployment/docker --env-file .local/ditto-runtime.env -f .local/ditto-upstream/deployment/docker/docker-compose.yml up -d
+`deploy/ditto/` is a self-contained copy of upstream `deployment/docker` at tag `3.9.8`,
+adapted as follows (see the header of `docker-compose.yml`):
+
+- **Pinned image tags.** [`deploy/image-pins.env`](deploy/image-pins.env) is the single source of
+  truth: Ditto `3.9.8`, `mongo:7.0.14` and `nginx:1.27.2-alpine`. Nothing uses `latest`. The
+  compose fallbacks repeat the same values, and `tests/test_deploy.py` checks that they match.
+- **Loopback-only ports.** Every published port binds to `127.0.0.1`: 8080 (API via nginx),
+  8081 (gateway direct) and 27017 (MongoDB). Upstream binds to `0.0.0.0`.
+- **Named MongoDB volume.** Data lives in the `ditto_mongodb_data` volume, so it survives a
+  normal reset.
+- **Vendored assets.** nginx's static assets (images, WoT models) are copied into `deploy/ditto/assets/`, so
+  no upstream checkout is needed at runtime.
+
+Docker Desktop needs at least 6 GB of memory, and host port 8080 must be free.
+
+Run from the repository root (Git Bash or WSL2 on Windows):
+
+```bash
+docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml pull
+docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml up -d
+bash deploy/health_check.sh --wait 300   # per-container health + API check, exit 0 = healthy
+python simulator/smoke_test.py           # policy -> thing -> update -> read back -> search
 ```
 
-Keep the upstream sample deployment local and private. Review its sample authentication and DevOps settings before use; do not expose ports beyond loopback or reuse its sample credentials. Stop it with:
+| Command | What it does |
+|---|---|
+| `bash deploy/health_check.sh [--wait N]` | Container state/health + `/health` + authenticated search |
+| `bash deploy/reset.sh` | `compose down`, pull the pinned images, `up -d`, then wait for healthy. **Keeps** MongoDB data |
+| `bash deploy/reset.sh --wipe-data` | Also deletes the MongoDB volume (asks for confirmation) |
+| `python simulator/smoke_test.py` | 5-step end-to-end API check, exit 0 = all PASS (`--help` for options) |
 
-```powershell
-docker compose --project-directory .local/ditto-upstream/deployment/docker --env-file .local/ditto-runtime.env -f .local/ditto-upstream/deployment/docker/docker-compose.yml down
-```
+- API: `http://127.0.0.1:8080/api/2/` (sample basic auth `ditto:ditto`, loopback only)
+- Ditto UI: `http://127.0.0.1:8080/ui/`
+- No Swagger UI. Upstream's `swagger-ui` service and `/apidoc` route were removed because they aren't needed. For
+  API reference, see https://www.eclipse.dev/ditto/http-api-doc.html.
+
+Gotchas:
+- **Use `127.0.0.1`, not `localhost`.** On Windows, `localhost` tries IPv6 `::1` first and
+  adds about 2 s to every new connection, which corrupts the latency SLIs.
+- **Restart the file-mounting containers after a branch switch.** If `git checkout` touches
+  files in `deploy/ditto/`, nginx returns `500` (`pread() ... nginx.htpasswd failed`).
+  Docker Desktop keeps the old file mount, so restart those containers:
+  `docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml restart nginx`.
+- **Optional upstream source.** You can clone the source for reference into the ignored
+  `vendor/` folder:
+  `git clone --branch 3.9.8 --depth 1 https://github.com/eclipse-ditto/ditto vendor/ditto`.
 
 Validate this repository's contracts:
 
@@ -77,7 +115,7 @@ python -m pip install -r requirements-dev.txt
 python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000`. Set `DITTO_COMPOSE_FILE` to the upstream Compose file and `PROMETHEUS_URL` to a loopback Prometheus instance once those are configured. Never bind this workbench to `0.0.0.0`.
+Open `http://127.0.0.1:8000`. Discovery reads `deploy/ditto/docker-compose.yml` by default (override with `DITTO_COMPOSE_FILE`). Set `PROMETHEUS_URL` to a loopback Prometheus instance once one is configured. Never bind this workbench to `0.0.0.0`.
 
 See [deployment instructions](docs/deployment.md) for version and telemetry caveats.
 

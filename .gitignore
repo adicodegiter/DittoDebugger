@@ -1,5 +1,6 @@
 # Local upstream checkout and runtime configuration
 .local/
+vendor/
 .env
 .env.*
 !.env.example
@@ -19,6 +20,7 @@ dist/
 coverage/
 
 # Local persistence, telemetry, and generated results
+data/
 *.sqlite
 *.sqlite3
 *.db
