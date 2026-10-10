@@ -21,7 +21,7 @@ class Settings:
         compose_file = Path(
             os.environ.get(
                 "DITTO_COMPOSE_FILE",
-                str(REPOSITORY_ROOT / ".local" / "ditto-upstream" / "deployment" / "docker" / "docker-compose.yml"),
+                str(REPOSITORY_ROOT / "deploy" / "ditto" / "docker-compose.yml"),
             )
         ).expanduser()
         manifest_value = os.environ.get("DITTO_KUBERNETES_MANIFESTS", "")
