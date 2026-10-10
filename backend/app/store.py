@@ -34,8 +34,11 @@ class LocalRepository:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS experiment_approvals ("
                 "experiment_id TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, decision TEXT NOT NULL, reason TEXT NOT NULL, "
-                "candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL)"
+                "candidate_hash TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT)"
             )
+            approval_columns = {row[1] for row in connection.execute("PRAGMA table_info(experiment_approvals)").fetchall()}
+            if "consumed_at" not in approval_columns:
+                connection.execute("ALTER TABLE experiment_approvals ADD COLUMN consumed_at TEXT")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS experiment_runs ("
                 "id TEXT PRIMARY KEY, run_json TEXT NOT NULL, created_at TEXT NOT NULL)"
@@ -43,6 +46,10 @@ class LocalRepository:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS findings ("
                 "id TEXT PRIMARY KEY, run_id TEXT NOT NULL, finding_json TEXT NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS audit_events ("
+                "id TEXT PRIMARY KEY, event TEXT NOT NULL, payload_json TEXT NOT NULL, recorded_at TEXT NOT NULL)"
             )
 
     def save_plan(self, plan: dict[str, Any]) -> dict[str, Any]:
@@ -98,7 +105,9 @@ class LocalRepository:
                     return result
         return None
 
-    def record_approval(self, experiment_id: str, decision: str, reason: str, candidate_hash: str) -> dict[str, Any]:
+    def record_approval(
+        self, experiment_id: str, decision: str, reason: str, candidate_hash: str, expires_after_minutes: int = 60
+    ) -> dict[str, Any]:
         experiment = self.get_experiment(experiment_id)
         if experiment is None:
             raise LookupError("Experiment was not found.")
@@ -113,7 +122,7 @@ class LocalRepository:
             "reason": reason,
             "candidate_hash": candidate_hash,
             "created_at": created_at.isoformat(),
-            "expires_at": (created_at.replace(microsecond=0) + timedelta(hours=1)).isoformat(),
+            "expires_at": (created_at.replace(microsecond=0) + timedelta(minutes=expires_after_minutes)).isoformat(),
             "execution_enabled": False,
         }
         with self._connect() as connection:
@@ -123,6 +132,21 @@ class LocalRepository:
                 (experiment_id, approval["approval_id"], decision, reason, candidate_hash, approval["created_at"], approval["expires_at"]),
             )
         return approval
+
+    def consume_approval(self, approval: dict[str, Any]) -> None:
+        approval_id = approval.get("approval_id")
+        candidate_hash = approval.get("candidate_hash")
+        if not approval_id or not candidate_hash:
+            raise ValueError("Approval identity is required for execution.")
+        consumed_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            result = connection.execute(
+                "UPDATE experiment_approvals SET consumed_at = ? "
+                "WHERE id = ? AND candidate_hash = ? AND decision = 'approve' AND consumed_at IS NULL",
+                (consumed_at, approval_id, candidate_hash),
+            )
+            if result.rowcount != 1:
+                raise ValueError("Approval has already been consumed or is invalid.")
 
     def save_run(self, run: dict[str, Any]) -> None:
         run_id = run.get("run_id")
@@ -167,6 +191,20 @@ class LocalRepository:
             else:
                 rows = connection.execute("SELECT finding_json FROM findings ORDER BY id DESC").fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def record_audit(self, event: str, payload: dict[str, Any]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO audit_events (id, event, payload_json, recorded_at) VALUES (?, ?, ?, ?)",
+                (uuid.uuid4().hex, event, json.dumps(payload), datetime.now(timezone.utc).isoformat()),
+            )
+
+    def list_audit(self, limit: int = 100) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT event, payload_json, recorded_at FROM audit_events ORDER BY recorded_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [{"event": row[0], "payload": json.loads(row[1]), "recorded_at": row[2]} for row in rows]
 
     def save_baseline(self, graph_version: str, telemetry: dict[str, Any]) -> dict[str, Any]:
         if telemetry.get("status") != "available":

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .orchestrator import AgentOrchestrator
 from .settings import REPOSITORY_ROOT, Settings
+from safety.runner import RunnerError
 
 
 class PlanRequest(BaseModel):
@@ -35,7 +36,7 @@ def create_app(settings: Settings | None = None, orchestrator: AgentOrchestrator
     def health() -> dict[str, Any]:
         return {
             "status": "ok",
-            "execution_enabled": False,
+            "execution_enabled": application.state.orchestrator.settings.execution_enabled,
             "agents": application.state.orchestrator.agent_status(),
             "notes": ["Health reports workbench process state only; it does not imply Ditto or Prometheus is reachable."],
         }
@@ -98,7 +99,7 @@ def create_app(settings: Settings | None = None, orchestrator: AgentOrchestrator
             "experiment_id": experiment_id,
             "status": experiment["approval_status"],
             "approval": experiment["approval"],
-            "execution_enabled": False,
+            "execution_enabled": application.state.orchestrator.settings.execution_enabled,
         }
 
     @application.post("/api/v1/experiments/{experiment_id}/approval", status_code=201)
@@ -129,12 +130,18 @@ def create_app(settings: Settings | None = None, orchestrator: AgentOrchestrator
             raise HTTPException(status_code=404, detail="Run was not found.")
         return {"findings": application.state.orchestrator.list_findings(run_id)}
 
+    @application.get("/api/v1/audit")
+    def list_audit(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
+        return {"events": application.state.orchestrator.list_audit(limit)}
+
     @application.post("/api/v1/experiments/{experiment_id}/execute")
-    def execute_experiment(experiment_id: str) -> None:
-        raise HTTPException(
-            status_code=503,
-            detail="Fault execution is disabled. Docker is unavailable or the local runner has not passed its safety preflight.",
-        )
+    def execute_experiment(experiment_id: str) -> dict[str, Any]:
+        try:
+            return application.state.orchestrator.execute_experiment(experiment_id)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except RunnerError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @application.get("/")
     def dashboard() -> FileResponse:

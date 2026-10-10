@@ -198,6 +198,16 @@ paths:
                 $ref: "#/components/schemas/FindingsResponse"
         "404":
           description: Run was not found
+  /api/v1/audit:
+    get:
+      operationId: listAuditEvents
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: Safety, execution, cleanup, and recovery audit history
 components:
   parameters:
     ExperimentId:
@@ -211,7 +221,7 @@ components:
       required: [status, execution_enabled, agents, notes]
       properties:
         status: { const: ok }
-        execution_enabled: { const: false }
+        execution_enabled: { type: boolean }
         agents: { type: array, items: { type: object } }
         notes: { type: array, items: { type: string } }
     Architecture:
