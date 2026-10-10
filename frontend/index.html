@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Ditto Resilience Workbench</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Ditto Resilience Workbench home">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span><strong>DITTO</strong><small>RESILIENCE WORKBENCH</small></span>
+    </a>
+    <div class="topbar-meta"><span class="local-indicator"></span>LOCAL ENVIRONMENT</div>
+  </header>
+
+  <main>
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">BOSCH HACKATHON / CLOUD-NATIVE RESILIENCE</p>
+        <h1>System overview</h1>
+      </div>
+      <button id="refresh-button" class="button button-secondary" type="button">Refresh discovery</button>
+    </section>
+
+    <section class="status-strip" aria-label="Workbench status">
+      <div><span class="status-label">TARGET</span><strong id="target-status">Checking</strong></div>
+      <div><span class="status-label">GRAPH SNAPSHOT</span><strong id="graph-version">Not loaded</strong></div>
+      <div><span class="status-label">TELEMETRY</span><strong id="telemetry-status">Checking</strong></div>
+      <div><span class="status-label">FAULT EXECUTION</span><strong class="status-disabled">Disabled</strong></div>
+    </section>
+
+    <section class="agent-section">
+      <div class="section-heading"><div><p class="eyebrow">COORDINATED SPECIALISTS</p><h2>Agent status</h2></div></div>
+      <div id="agent-list" class="agent-list" aria-live="polite"></div>
+    </section>
+
+    <section class="architecture-section">
+      <div class="section-heading"><div><p class="eyebrow">DISCOVERY EVIDENCE</p><h2>Architecture map</h2></div><span id="node-count" class="quiet-count">0 components</span></div>
+      <div class="graph-frame">
+        <div id="graph-empty" class="empty-state">No deployment manifest discovered. Point <code>DITTO_COMPOSE_FILE</code> at a pinned local Ditto checkout to build the real graph.</div>
+        <svg id="architecture-graph" class="architecture-graph" role="img" aria-label="Discovered component graph" hidden></svg>
+      </div>
+      <p id="graph-note" class="source-note">Only declared relationships and documented Ditto cluster membership are shown. Shared Docker networks are not treated as runtime calls.</p>
+    </section>
+
+    <section class="lower-grid">
+      <div class="telemetry-section">
+        <div class="section-heading"><div><p class="eyebrow">PROMETHEUS</p><h2>Observations</h2></div><span id="coverage" class="quiet-count">0% coverage</span></div>
+        <div id="telemetry-list" class="telemetry-list"><p class="muted">Waiting for a local Prometheus endpoint.</p></div>
+      </div>
+
+      <div class="planner-section">
+        <div class="section-heading"><div><p class="eyebrow">DETERMINISTIC HEURISTIC</p><h2>Experiment planner</h2></div></div>
+        <p class="planner-copy">Ranking combines graph impact, untested coverage, and uncertainty. It requires a healthy baseline and current telemetry.</p>
+        <div class="planner-controls">
+          <button id="baseline-button" class="button button-secondary" type="button">Capture baseline</button>
+          <label for="baseline-id">Baseline ID</label>
+          <input id="baseline-id" type="text" inputmode="text" autocomplete="off" placeholder="Capture a baseline first">
+          <button id="plan-button" class="button button-primary" type="button">Plan experiments</button>
+        </div>
+        <div id="plan-results" class="plan-results" aria-live="polite"><p class="muted">No candidates. Planning remains blocked until real topology and healthy telemetry are available.</p></div>
+      </div>
+    </section>
+
+    <footer><span>Read-only discovery and planning build</span><span>Docker fault runner not enabled</span></footer>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

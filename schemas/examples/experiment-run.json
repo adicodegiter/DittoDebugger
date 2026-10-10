@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "run_id": "run-local-001",
+  "experiment_id": "restart-gateway-10s",
+  "status": "completed",
+  "created_at": "2026-10-10T12:00:00Z",
+  "prediction": { "expected_unavailable_seconds": 10 },
+  "observations": [{ "metric": "http_success_ratio", "value": 0.91, "window": "during" }],
+  "cleanup_state": "complete",
+  "safety_violation": false
+}

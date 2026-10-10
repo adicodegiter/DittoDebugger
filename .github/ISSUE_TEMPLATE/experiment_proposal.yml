@@ -1,0 +1,31 @@
+name: Experiment proposal
+description: Propose a bounded, authorized resilience experiment.
+title: "experiment: "
+labels: [experiment]
+body:
+  - type: input
+    id: target
+    attributes:
+      label: Target component and environment
+      placeholder: Local Ditto service and pinned version
+    validations:
+      required: true
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis and expected impact
+    validations:
+      required: true
+  - type: textarea
+    id: guardrails
+    attributes:
+      label: Preconditions, duration, abort, cleanup, and recovery checks
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Metrics and evidence
+      description: State baseline, expected signals, and how a result can be reproduced.
+    validations:
+      required: true

@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a scoped capability with acceptance criteria.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who needs this and what is not possible today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Acceptance criteria
+      description: State observable, testable outcomes and explicit non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Architecture and safety impact
+      description: Identify modules, contracts, data, permissions, and failure modes affected.
+    validations:
+      required: true

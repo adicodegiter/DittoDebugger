@@ -1,0 +1,23 @@
+name: Architecture decision
+description: Record an architecture question and alternatives.
+title: "adr: "
+labels: [architecture]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and constraints
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and trade-offs
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed decision and consequences
+    validations:
+      required: true

@@ -1,0 +1,35 @@
+# Local upstream checkout and runtime configuration
+.local/
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (planned)
+node_modules/
+dist/
+coverage/
+
+# Local persistence, telemetry, and generated results
+*.sqlite
+*.sqlite3
+*.db
+results/**
+!results/.gitkeep
+*.log
+*.har
+*.pcap
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

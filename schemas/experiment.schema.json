@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ditto-ai-chaos/schemas/experiment.schema.json",
+  "title": "Proposed controlled experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "target_component", "action", "duration_seconds", "hypothesis", "predicted_impacts", "risk_score", "approval_required"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "target_component": { "type": "string", "minLength": 1 },
+    "action": { "enum": ["restart_container"] },
+    "duration_seconds": { "type": "integer", "minimum": 1, "maximum": 30 },
+    "hypothesis": { "type": "string", "minLength": 1 },
+    "predicted_impacts": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "information_gain": { "type": "number", "minimum": 0, "maximum": 1 },
+    "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "approval_required": { "const": true },
+    "selection_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "score_terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["impact", "novelty", "uncertainty"],
+      "properties": {
+        "impact": { "type": "number", "minimum": 0, "maximum": 1 },
+        "novelty": { "type": "number", "minimum": 0, "maximum": 1 },
+        "uncertainty": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "ranking_method": { "const": "weighted_heuristic_v1" }
+  }
+}

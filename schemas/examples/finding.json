@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "id": "finding-run-local-001-1",
+  "run_id": "run-local-001",
+  "severity": "medium",
+  "summary": "Gateway requests failed during the approved restart window.",
+  "evidence": ["run-local-001: http_success_ratio=0.91 during experiment", "run-local-001: gateway /alive returned healthy after restart"],
+  "recommendation": "For deployments requiring uninterrupted API access, evaluate multiple gateway replicas behind a health-aware load balancer.",
+  "confidence": 0.82,
+  "ai_generated": false
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ditto-ai-chaos/schemas/service.schema.json",
+  "title": "Discovered component",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name", "kind", "source", "confidence"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["ditto_service", "database", "proxy", "load_generator", "support", "kubernetes_service"] },
+    "source": { "enum": ["compose", "kubernetes", "ditto_docs", "runtime", "operator"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "health_url": { "type": ["string", "null"], "format": "uri" },
+    "metrics_url": { "type": ["string", "null"], "format": "uri" },
+    "image": { "type": ["string", "null"] },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["container_port", "protocol", "host_ip", "host_port"],
+        "properties": {
+          "container_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "protocol": { "type": "string" },
+          "host_ip": { "type": ["string", "null"] },
+          "host_port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },
+          "service_port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },
+          "target_port": { "type": ["integer", "string", "null"] },
+          "node_port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 }
+        }
+      }
+    },
+    "health_checks": { "type": "array", "items": { "type": "object" } },
+    "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

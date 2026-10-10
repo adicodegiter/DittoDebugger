@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "id": "restart-gateway-10s",
+  "target_component": "gateway",
+  "action": "restart_container",
+  "duration_seconds": 10,
+  "hypothesis": "The API entry service becomes unavailable briefly and returns after restart without persistent data loss.",
+  "predicted_impacts": ["gateway", "ditto-api-clients"],
+  "information_gain": 0.7,
+  "risk_score": 0.2,
+  "evidence_refs": ["architecture:ditto-gateway", "baseline:latest"],
+  "approval_required": true
+}

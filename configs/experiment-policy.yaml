@@ -1,0 +1,32 @@
+version: 1
+scope:
+  environment: local-only
+  compose_project: ditto
+  allowed_targets:
+    - gateway
+    - things-search
+  denied_targets:
+    - mongodb
+max_concurrent_experiments: 1
+max_duration_seconds: 30
+max_risk_score: 0.35
+baseline_max_age_seconds: 3600
+target_risk_scores:
+  gateway: 0.2
+  things-search: 0.3
+approval:
+  required: true
+  expires_after_minutes: 10
+actions:
+  restart_container:
+    enabled: true
+    duration_seconds_default: 10
+    cleanup: restart_target
+abort_conditions:
+  - baseline_unhealthy
+  - unrelated_component_unhealthy
+  - error_rate_above_configured_limit
+  - experiment_deadline_exceeded
+notes:
+  - This policy is a design-time contract; no chaos runner exists yet.
+  - Never point a runner at a public, shared, or production deployment.

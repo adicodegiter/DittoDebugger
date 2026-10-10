@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ditto-ai-chaos/schemas/experiment-run.schema.json",
+  "title": "Experiment execution record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "experiment_id", "status", "created_at", "prediction", "observations", "cleanup_state"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["approved", "running", "recovering", "completed", "aborted", "failed"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "prediction": { "type": "object" },
+    "observations": { "type": "array", "items": { "type": "object" } },
+    "cleanup_state": { "enum": ["not_started", "required", "complete", "failed"] },
+    "safety_violation": { "type": "boolean", "default": false }
+  }
+}

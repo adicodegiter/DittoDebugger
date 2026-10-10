@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "id": "ditto-gateway",
+  "name": "Gateway",
+  "kind": "ditto_service",
+  "source": "ditto_docs",
+  "confidence": 1.0,
+  "health_url": null,
+  "metrics_url": "http://localhost:19095/",
+  "labels": { "ditto_service": "gateway", "environment": "local" }
+}

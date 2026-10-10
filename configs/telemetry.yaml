@@ -1,0 +1,30 @@
+version: 1
+ditto:
+  base_url: http://localhost:8080
+  health_path: /alive
+  health_port: 7626
+  metrics_port: 9095
+  metrics_path: /
+  metrics_targets:
+    gateway: http://localhost:19095/
+    policies: http://localhost:19096/
+    things: http://localhost:19097/
+    things-search: http://localhost:19098/
+    connectivity: http://localhost:19099/
+prometheus:
+  base_url: http://localhost:9090
+  scrape_interval_seconds: 5
+  retention_hours: 24
+collection:
+  baseline_seconds: 120
+  experiment_window_seconds: 60
+  recovery_timeout_seconds: 120
+  required_metrics:
+    - roundtrip_http_seconds
+    - jvm_gc_seconds
+    - jvm_memory_bytes
+    - jvm_threads
+limitations:
+  - The default upstream Compose file does not publish per-service metrics ports to the host.
+  - Add loopback-only port mappings in a local Compose override before enabling these targets.
+  - Metric names and labels must be checked against the pinned Ditto version at preflight.

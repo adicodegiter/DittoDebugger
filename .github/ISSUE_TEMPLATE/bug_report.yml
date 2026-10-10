@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible defect in the workbench or documentation.
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Include expected and observed behavior. Redact credentials and private data.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Steps, pinned Ditto version, environment, and relevant sanitized output.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety impact
+      description: Could this affect target scope, approval, execution, cleanup, or secrets?
+    validations:
+      required: true
