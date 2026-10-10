@@ -11,7 +11,8 @@
 # Adapted from eclipse-ditto/ditto deployment/docker (EPL-2.0) for this project:
 #  - all image tags pinned (DITTO_VERSION default 3.9.8, mongo 7.0.14, nginx 1.27.2-alpine)
 #  - host ports bound to 127.0.0.1 only (localhost-only rule)
-#  - doc/swagger assets vendored into ./assets so the folder is self-contained
+#  - nginx static assets (images, wot) vendored into ./assets so the folder is self-contained
+#  - swagger-ui service and /apidoc route removed (not needed; upstream doc files tripped gitleaks)
 #  - unused host bind-mount volume (/var/log/ditto) removed
 #  - MongoDB data in named volume 'mongodb_data' (survives reset.sh; delete only with --wipe-data)
 name: ditto
@@ -234,27 +235,6 @@ services:
       options:
         max-size: 10m
         
-  swagger-ui:
-    image: docker.io/swaggerapi/swagger-ui:v5.9.1
-    deploy:
-      resources:
-        limits:
-          memory: 32m
-    restart: always
-    environment:
-      - QUERY_CONFIG_ENABLED=true
-    volumes:
-       - ./assets/openapi:/usr/share/nginx/html/openapi:ro
-       - ./assets/images:/usr/share/nginx/html/images:ro
-       - ./swagger3-index.html:/usr/share/nginx/html/index.html:ro
-       - ./assets/swagger-oidc.js:/usr/share/nginx/html/swagger-oidc.js:ro
-       # optionally provide the same "ui-config.json" as for the Ditto UI:
-       # - ./ui-config.json:/usr/share/nginx/html/ui-config.json:ro
-    command: nginx -g 'daemon off;'  
-    logging:
-      options:
-        max-size: 10m
-        
   nginx:
     image: docker.io/nginx:1.27.2-alpine
     deploy:
@@ -274,7 +254,6 @@ services:
       - "127.0.0.1:${DITTO_EXTERNAL_PORT:-8080}:80"
     depends_on:
       - gateway
-      - swagger-ui
     logging:
       options:
         max-size: 10m

@@ -58,7 +58,7 @@ adapted as follows (see the header of `docker-compose.yml`):
   8081 (gateway direct) and 27017 (MongoDB). Upstream binds to `0.0.0.0`.
 - **Named MongoDB volume.** Data lives in the `ditto_mongodb_data` volume, so it survives a
   normal reset.
-- **Vendored assets.** The doc and swagger assets are copied into `deploy/ditto/assets/`, so
+- **Vendored assets.** nginx's static assets (images, WoT models) are copied into `deploy/ditto/assets/`, so
   no upstream checkout is needed at runtime.
 
 Docker Desktop needs at least 6 GB of memory, and host port 8080 must be free.
@@ -77,7 +77,8 @@ python scripts/workload/smoke_test.py      # policy -> thing -> update -> read b
 
 - API: `http://127.0.0.1:8080/api/2/` (sample basic auth `ditto:ditto`, loopback only)
 - Ditto UI: `http://127.0.0.1:8080/ui/`
-- Swagger: `http://127.0.0.1:8080/apidoc/`
+- No Swagger UI. Upstream's `swagger-ui` service and `/apidoc` route were removed because they aren't needed. For
+  API reference, see https://www.eclipse.dev/ditto/http-api-doc.html.
 
 Gotchas:
 - **Use `127.0.0.1`, not `localhost`.** On Windows, `localhost` tries IPv6 `::1` first and
@@ -85,7 +86,7 @@ Gotchas:
 - **Restart the file-mounting containers after a branch switch.** If `git checkout` touches
   files in `deploy/ditto/`, nginx returns `500` (`pread() ... nginx.htpasswd failed`).
   Docker Desktop keeps the old file mount, so restart those containers:
-  `cd deploy/ditto && docker compose restart nginx swagger-ui`.
+  `cd deploy/ditto && docker compose restart nginx`.
 - **Optional upstream source.** You can clone the source for reference into the ignored
   `vendor/` folder:
   `git clone --branch 3.9.8 --depth 1 https://github.com/eclipse-ditto/ditto vendor/ditto`.
