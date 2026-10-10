@@ -1,8 +1,11 @@
 # Local upstream checkout and runtime configuration
 .local/
+vendor/
 .env
 .env.*
 !.env.example
+# Compose config (version pins only, no secrets) must be committed
+!deploy/ditto/.env
 
 # Python
 .venv/
@@ -19,6 +22,7 @@ dist/
 coverage/
 
 # Local persistence, telemetry, and generated results
+data/
 *.sqlite
 *.sqlite3
 *.db
