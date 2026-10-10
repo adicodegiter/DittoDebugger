@@ -8,7 +8,6 @@ Running list for the team submission form. Add an entry whenever you introduce s
 | Eclipse Ditto (policies, things, things-search, connectivity, gateway, ditto-ui) | 3.9.8 | Digital-twin platform under test | EPL-2.0 |
 | MongoDB | 7.0.14 | Ditto persistence | SSPL |
 | nginx | 1.27.2-alpine | Ditto reverse proxy / basic auth | BSD-2-Clause |
-| swagger-ui | v5.9.1 | Ditto API docs (bundled with Ditto deployment) | Apache-2.0 |
 
 ## Runtime and tooling
 | Item | Version | Purpose |
