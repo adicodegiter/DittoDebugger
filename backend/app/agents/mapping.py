@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from .discovery import DITTO_ROLES, DiscoveryReport
@@ -22,6 +23,12 @@ DITTO_SLI_TAGS = {
 @dataclass(frozen=True)
 class ArchitectureMapperAgent:
     name: str = "Architecture and Dependency Mapping Agent"
+    export_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.export_path is None:
+            repo_root = Path(__file__).resolve().parents[3]
+            object.__setattr__(self, "export_path", repo_root / "ai" / "dependency_map.json")
 
     def map(self, report: DiscoveryReport) -> dict[str, Any]:
         nodes = [component.to_dict() for component in report.components]
@@ -83,7 +90,7 @@ class ArchitectureMapperAgent:
             "impact_paths": self._impact_paths(component_ids, relationships),
         }
         graph_version = hashlib.sha256(json.dumps(canonical_graph, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:16]
-        return {
+        graph = {
             "schema_version": "1.0",
             "status": report.status,
             "graph_version": graph_version,
@@ -92,6 +99,16 @@ class ArchitectureMapperAgent:
             "source_files": list(report.source_files),
             "warnings": list(report.warnings),
         }
+        self._write_dependency_map(graph)
+        return graph
+
+    def _write_dependency_map(self, graph: dict[str, Any]) -> None:
+        if not self.export_path:
+            return
+        self.export_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.export_path.open("w", encoding="utf-8") as stream:
+            json.dump(graph, stream, indent=2, sort_keys=True)
+            stream.write("\n")
 
     @staticmethod
     def _documented_ditto_edges(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
