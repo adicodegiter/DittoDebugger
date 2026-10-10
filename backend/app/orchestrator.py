@@ -41,7 +41,32 @@ class AgentOrchestrator:
         baseline = self.repository.get_baseline(baseline_id)
         if baseline is None:
             raise LookupError("Baseline was not found.")
-        return self.planning_agent.plan(graph, telemetry, baseline, max_candidates)
+        plan = self.planning_agent.plan(graph, telemetry, baseline, max_candidates)
+        return self.repository.save_plan(plan)
+
+    def list_plans(self, limit: int = 50) -> list[dict[str, Any]]:
+        return self.repository.list_plans(limit)
+
+    def get_experiment(self, experiment_id: str) -> dict[str, Any] | None:
+        return self.repository.get_experiment(experiment_id)
+
+    def record_approval(self, experiment_id: str, decision: str, reason: str, candidate_hash: str) -> dict[str, Any]:
+        return self.repository.record_approval(experiment_id, decision, reason, candidate_hash)
+
+    def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
+        return self.repository.list_runs(limit)
+
+    def record_run(self, run: dict[str, Any]) -> None:
+        self.repository.save_run(run)
+
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
+        return self.repository.get_run(run_id)
+
+    def record_findings(self, run_id: str, findings: list[dict[str, Any]]) -> None:
+        self.repository.save_findings(run_id, findings)
+
+    def list_findings(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        return self.repository.list_findings(run_id)
 
     def agent_status(self) -> list[dict[str, str]]:
         discovery = "ready" if self.settings.compose_file.is_file() or any(path.is_file() for path in self.settings.kubernetes_manifests) else "waiting_for_manifest"
