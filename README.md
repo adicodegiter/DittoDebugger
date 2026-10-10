@@ -35,7 +35,10 @@ The upstream Ditto module paths and the custom workbench code map are in [Ditto 
 - Verified upstream target: [eclipse-ditto/ditto](https://github.com/eclipse-ditto/ditto), release `3.9.8` as checked on 2026-10-10.
 - Local Ditto startup, benchmark dependencies, health/metrics endpoints, license, and architectural boundaries are documented in [Ditto integration](docs/ditto-integration.md).
 - JSON Schemas and examples define shared data contracts in [schemas](schemas/); Compose and Kubernetes discovery, Prometheus normalization, local SQLite baseline history, deterministic ranking, FastAPI routes, and the local dashboard are implemented.
-- **M0 (Ditto runtime) verified 2026-10-10:** `deploy/ditto` runs Ditto 3.9.8 on Docker Desktop (Windows 11, 7.6 GiB for Docker). All 5 Ditto services report healthy, the API answers on `127.0.0.1:8080`, and `scripts/workload/smoke_test.py` passes 5/5.
+- **M0 (Ditto runtime) verified 2026-10-10** on Docker Desktop (Windows 11, 7.6 GiB for Docker). The stack runs with the image pins from `deploy/image-pins.env`, all 5 Ditto services report healthy, and the API answers on `127.0.0.1:8080`. `simulator/smoke_test.py` passes 5/5, which confirms on the live stack:
+  - the Ditto v2 API paths (`/api/2/policies`, `/api/2/things`, `/api/2/search/things`)
+  - the policy body with the `nginx:ditto` subject
+  - the `mongo:7.0.14` tag
 - The Docker chaos runner, Prometheus preflight and diagnosis agent are not implemented yet. The execute endpoint returns `503` by design.
 - Team repository: https://github.com/adicodegiter/ditto-debugger
 
@@ -52,8 +55,9 @@ The upstream Ditto module paths and the custom workbench code map are in [Ditto 
 `deploy/ditto/` is a self-contained copy of upstream `deployment/docker` at tag `3.9.8`,
 adapted as follows (see the header of `docker-compose.yml`):
 
-- **Pinned image tags.** Ditto is pinned to `3.9.8` via `deploy/ditto/.env`, MongoDB to
-  `mongo:7.0.14` and nginx to `nginx:1.27.2-alpine`. Nothing uses `latest`.
+- **Pinned image tags.** [`deploy/image-pins.env`](deploy/image-pins.env) is the single source of
+  truth: Ditto `3.9.8`, `mongo:7.0.14` and `nginx:1.27.2-alpine`. Nothing uses `latest`. The
+  compose fallbacks repeat the same values, and `tests/test_deploy.py` checks that they match.
 - **Loopback-only ports.** Every published port binds to `127.0.0.1`: 8080 (API via nginx),
   8081 (gateway direct) and 27017 (MongoDB). Upstream binds to `0.0.0.0`.
 - **Named MongoDB volume.** Data lives in the `ditto_mongodb_data` volume, so it survives a
@@ -63,17 +67,21 @@ adapted as follows (see the header of `docker-compose.yml`):
 
 Docker Desktop needs at least 6 GB of memory, and host port 8080 must be free.
 
+Run from the repository root (Git Bash or WSL2 on Windows):
+
 ```bash
-cd deploy/ditto && docker compose pull && docker compose up -d && cd ../..
-bash deploy/health_check.sh --wait 300     # per-container health + API check, exit 0 = healthy
-python scripts/workload/smoke_test.py      # policy -> thing -> update -> read back -> search
+docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml pull
+docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml up -d
+bash deploy/health_check.sh --wait 300   # per-container health + API check, exit 0 = healthy
+python simulator/smoke_test.py           # policy -> thing -> update -> read back -> search
 ```
 
 | Command | What it does |
 |---|---|
 | `bash deploy/health_check.sh [--wait N]` | Container state/health + `/health` + authenticated search |
-| `bash deploy/reset.sh` | `compose down` + `up -d`, waits for healthy; **keeps** MongoDB data |
+| `bash deploy/reset.sh` | `compose down`, pull the pinned images, `up -d`, then wait for healthy. **Keeps** MongoDB data |
 | `bash deploy/reset.sh --wipe-data` | Also deletes the MongoDB volume (asks for confirmation) |
+| `python simulator/smoke_test.py` | 5-step end-to-end API check, exit 0 = all PASS (`--help` for options) |
 
 - API: `http://127.0.0.1:8080/api/2/` (sample basic auth `ditto:ditto`, loopback only)
 - Ditto UI: `http://127.0.0.1:8080/ui/`
@@ -86,7 +94,7 @@ Gotchas:
 - **Restart the file-mounting containers after a branch switch.** If `git checkout` touches
   files in `deploy/ditto/`, nginx returns `500` (`pread() ... nginx.htpasswd failed`).
   Docker Desktop keeps the old file mount, so restart those containers:
-  `cd deploy/ditto && docker compose restart nginx`.
+  `docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml restart nginx`.
 - **Optional upstream source.** You can clone the source for reference into the ignored
   `vendor/` folder:
   `git clone --branch 3.9.8 --depth 1 https://github.com/eclipse-ditto/ditto vendor/ditto`.

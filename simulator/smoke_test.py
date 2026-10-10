@@ -15,8 +15,8 @@ from pathlib import Path
 
 import requests
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.common.config import API, AUTH, DITTO_URL, NAMESPACE, POLICY_ID, policy_body  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from simulator.config import API, AUTH, DITTO_BASE_URL, NAMESPACE, POLICY_ID, policy_body  # noqa: E402
 
 
 def main() -> int:
@@ -82,7 +82,7 @@ def main() -> int:
                 return False, f"GET search -> {r.status_code}, 0 hits after {attempts} attempts"
             time.sleep(0.5)
 
-    print(f"Ditto smoke test against {DITTO_URL}\n")
+    print(f"Ditto smoke test against {DITTO_BASE_URL}\n")
     # Each step depends on the previous one, so stop at the first failure.
     for name, fn in [("create policy", create_policy), ("create thing", create_thing),
                      ("update feature property", update_feature), ("read back property", read_back),

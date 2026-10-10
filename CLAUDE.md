@@ -1,176 +1,153 @@
-# Project: AI-Driven Chaos Engineering for a Connected-Vehicle Digital Twin Backend
+# Project: Ditto Resilience Workbench
+AI-driven chaos engineering for a connected-vehicle digital-twin backend (Bosch BGSW hackathon, 2 days).
 
 ## What we are building
-A 2-day Bosch (BGSW) hackathon project. A coordinated multi-agent AI system that discovers
-the architecture of a cloud-native app running locally, plans and safely injects controlled
-failures, observes the impact, and produces a ranked, evidence-backed findings report with
-recommended fixes and a resilience score.
+One coordinated system that maps a locally running Eclipse Ditto deployment, measures its
+healthy behaviour under a simulated vehicle fleet, plans safe failure experiments, runs them
+through a deterministic control plane with a kill switch, and produces an evidence-linked,
+ranked findings report with fixes and a resilience score.
 
-- **Application under test:** Eclipse Ditto (digital-twin platform), pinned release, deployed
-  locally with Docker Compose, driven by a simulated fleet of vehicles sending telemetry.
+- **Application under test:** Eclipse Ditto **3.9.8** (pinned in `deploy/image-pins.env`),
+  Docker Compose, on the team's Windows host (Docker Desktop + WSL2).
 - **Pitch line:** AI-driven chaos engineering for a connected-vehicle digital-twin backend,
   built on Eclipse Ditto (a Bosch-originated platform).
-- This is ONE coordinated system, not five separate projects.
 
 ## Hard rules (from the hackathon brief; never break these)
-- Everything runs ONLY on our own machines (localhost or the team's private network).
-  No public sandboxes, no cloud services, no external endpoints in the app under test.
+- Everything runs ONLY locally. `DITTO_BASE_URL` defaults to localhost; no public
+  sandboxes, cloud services or external endpoints in the app under test.
 - Never affect anything outside our own Ditto containers: not the host network, the Docker
   daemon, other machines, other teams, or shared infrastructure.
-- LLMs never execute anything. Only the deterministic chaos runner executes, and only
-  predefined actions on allowlisted targets from an approved, immutable plan.
-- Every experiment MUST have: a defined rollback, a max duration, abort thresholds, and
-  verified recovery. No experiment runs without the safety controller's approval.
-- Disruptive execution stays disabled until milestones M0–M3 pass.
+- Agents never execute anything. Only the deterministic control plane executes, and only
+  predefined actions on allowlisted targets from a human-approved, immutable plan.
+- Every experiment MUST have: rollback, max duration, abort thresholds, recovery check.
+- The API `execute` endpoint returns 503 by design. Keep it that way until the runner,
+  rollback and kill switch are wired and the forbidden-action tests pass (M3 gate).
+- Never invent services or edges without a manifest source. Never report a healthy
+  baseline when samples or metrics are missing.
+- Pin every image; never `latest`. No secrets in code (read from env / `.env`).
+- Every LLM feature has a working no-API-key fallback; LLM output is schema-checked.
 - Ask before destructive commands (docker system prune, volume deletion, rm -rf, anything
-  outside this repo).
-- Pin all image versions. Never use `latest`.
-- No API keys in code. Read secrets from environment variables / `.env` (gitignored).
-  Every LLM feature must have a working no-API-key fallback.
-- Never report a healthy baseline if required metrics are missing.
+  outside this repo). No `git push` without the user's confirmation.
 
-## Architecture
+## Architecture: three agents over a deterministic control plane
 
-```
-            Ditto target application (pinned, Docker Compose)
-   nginx -> gateway -> policies / things / things-search / connectivity -> MongoDB
-                 ^                                          |
-   workload: simulated vehicle fleet          metrics + live stream + probes
-                 |                                          v
- +----------------------------- AI agents ------------------------------+
- | 1 Discovery -> 2 Topology -> 3 Telemetry -> 4 Planner -> 5 Diagnosis  |
- +--------------------------------^-------------------------------------+
-                Supervisor / orchestrator (validates + records state)
-                                  |
-          Safety controller (deterministic) -> Chaos runner (deterministic)
-                                  |
-            Dashboard, evaluation, reports, resilience score
-```
+| Agent | Built from | Owns | Must not do |
+|---|---|---|---|
+| 1. Topology & Evidence | Existing discovery + mapping code | `backend/app/agents/discovery.py`, `backend/app/agents/mapping.py`, `ai/dependency_map.json` | Invent services or edges with no manifest source |
+| 2. Workload & Measurement | Three SLIs, JSON Lines rule, bounded workload | `simulator/`, `monitor/`, `data/metrics/` | Report a healthy baseline when samples are missing |
+| 3. Planner & Analyst (AI) | Existing planner, history, report requirement | `backend/app/agents/planning.py`, `ai/` report code | Execute anything; output must be schema-checked and evidence-linked |
 
-### AI agents (may use an LLM for explanation; outputs are structured records)
-1. **Discovery agent** — extracts services, images, ports, health checks and config
-   dependencies from the actual Ditto deployment. Records source + confidence per fact.
-2. **Topology agent** — builds a versioned dependency graph and impact paths. Every edge is
-   labelled `documented`, `configured`, or `runtime-observed` (manual additions marked `manual`).
-3. **Telemetry agent** — collects metrics, establishes baselines, checks freshness and
-   coverage, flags anomalies. Emits normalized observations, not raw logs.
-4. **Experiment planner** — ranks candidate experiments by impact, novelty, uncertainty,
-   risk, graph coverage and previous outcomes, with a one-line reason for each.
-5. **Diagnosis and explanation agent** — compares predicted vs observed behavior and produces
-   evidence-linked findings, severity ranking and remediation recommendations.
+**Control plane (deterministic, NOT an agent):** `chaos/` (runner, kill switch, rollback,
+recovery check), `configs/experiment-policy.yaml` (allowlist, fault catalog, thresholds),
+`deploy/` (pinned Compose, image pins, health check, reset).
 
-### Deterministic control systems (NOT LLM agents)
-- **Supervisor / orchestrator** — coordinates agents via versioned structured records, never
-  free-form agent-to-agent prompts; validates every agent output against schemas.
-- **Safety controller** — target allowlist, human approval, immutable experiment plans,
-  abort limits (the kill switch).
-- **Chaos runner** — executes only approved, bounded, predefined actions; performs cleanup
-  and verifies recovery.
+**Interaction flow**
+1. Agent 1 produces a versioned graph and passes its graph ID to Agent 2.
+2. Agent 2 returns a baseline and samples for that graph.
+3. Agent 3 ranks candidate experiments (gated on graph, telemetry coverage and baseline
+   freshness) with predicted impact and a reason.
+4. A human approves one plan; it becomes immutable.
+5. The control plane runs it with the kill switch, max duration and rollback.
+6. Agent 2 measures impact and recovery.
+7. Agent 3 compares predicted vs observed and writes the findings report.
 
-## SLIs (what we measure, from the user's point of view)
-1. **Write path:** success rate + p50/p95 latency of telemetry writes
-2. **Freshness:** staleness = now − telemetry timestamp, seen via the SSE live stream
-3. **Search path:** success rate + latency of fleet search queries
-Plus container health and resource metrics (Prometheus or compatible source).
-**Recovery time** = time from rollback until all three SLIs are back within baseline.
+Ditto services: nginx → gateway → policies / things / things-search / connectivity → MongoDB.
 
-## Abort thresholds (starting values; tune after the baseline exists)
+## SLIs (Agent 2)
+1. **Write path:** success rate + p50/p95 latency of telemetry writes — built
+2. **Search path:** success rate + latency of fleet search queries — built
+3. **Freshness:** staleness = now − telemetry timestamp. Currently a **poll-based proxy,
+   labelled as such**; target is the SSE live stream (pending).
+**Recovery time** = rollback until all SLIs are back within baseline.
+All samples are JSON Lines in `data/metrics/*.jsonl`, ISO-8601 UTC timestamps.
+
+## Kill switch thresholds (logic built and tested; not yet wired to a runner)
 | Signal | Abort when | Window |
 |---|---|---|
 | Write error rate | > 20% | last 30 s |
 | Write p95 latency | > 3x baseline p95 | last 30 s |
 | Freshness p95 staleness | > 30 s | last 30 s |
+| Missing samples | treated as unhealthy, never as healthy | last 30 s |
 | Any experiment | exceeds `max_duration_s` | — |
 
-## Allowed fault types (predefined actions only)
-container stop, container pause, network delay/loss (inside the target container's network
-namespace only), MongoDB CPU throttle (`docker update --cpus`), capped disk fill inside our
-MongoDB volume (rollback deletes it), traffic burst via the workload generator.
+## Allowed fault types (predefined control-plane actions only)
+First: container restart/stop of `things-search` (M4). Then: container pause, MongoDB CPU
+throttle (`docker update --cpus`), network delay inside a target container's namespace,
+traffic burst via the workload, capped disk fill in our MongoDB volume (rollback deletes it).
 Combined failures are a Day-2 stretch goal.
 
 ## Repo layout
 ```
 backend/app/
-  main.py               # API (Person 2)
-  settings.py           # config + pinned Ditto release (Person 1)
-  agents/
-    discovery.py        # Person 1
-    mapping.py          # topology agent (Person 2)
-    telemetry.py        # Person 3
-    planning.py         # Person 4
-    diagnosis.py        # Person 4
-  safety/               # safety controller (Person 5)
-  run/                  # chaos runner (Person 5)
-  evaluation/           # recovery checks, resilience score (Person 5)
-schemas/                # shared versioned contracts (Person 2 publishes first)
-configs/
-  experiment-policy.yaml  # allowlist, fault catalog, thresholds (Person 5)
-deploy/ditto/           # pinned compose files, health_check.sh, reset.sh (Person 1)
-scripts/workload/       # bootstrap.py, fleet_sim.py, smoke_test.py (Person 3)
-scripts/probes/         # SSE freshness subscriber, search prober (Person 3)
-frontend/               # dashboard: graph, experiment history, findings (Person 2)
-docs/                   # architecture overview, findings report
-data/                   # runtime metrics + experiment records (gitignored)
-vendor/                 # cloned upstream Ditto (gitignored)
+  main.py, settings.py
+  agents/discovery.py, mapping.py, planning.py     # Agents 1 and 3
+simulator/          # bootstrap + fleet workload (Agent 2)
+monitor/            # write, search, freshness probes; SLI math (Agent 2)
+chaos/              # runner, kill switch, rollback, recovery (control plane)
+ai/                 # dependency_map.json, diagnosis + report code
+configs/experiment-policy.yaml
+deploy/             # image-pins.env, compose file, health_check, reset
+schemas/            # versioned shared contracts
+frontend/           # dashboard
+docs/               # architecture overview, findings report
 tests/
-TOOLS.md                # running list of tools, libraries, AI models (for the team form)
+data/               # runtime metrics + experiment records (gitignored)
+TOOLS.md            # tools, libraries, AI models (for the team form)
 ```
 
-## Ownership
-| Person | Owns | Deliverable |
+## Team ownership (5 people, 3 agents + control plane)
+| Person | Owns |
+|---|---|
+| P1 | Ditto deploy (`deploy/`), discovery (Agent 1), integration + merges |
+| P2 | Mapping / graph (Agent 1), schemas, API, dashboard, architecture page |
+| P3 | Workload + measurement (Agent 2), SSE freshness, baseline, demo video |
+| P4 | Planner + analyst (Agent 3), diagnosis, findings report |
+| P5 | Control plane: policy, runner, kill-switch wiring, rollback, resilience score |
+
+## Current status (branch `feat/fleet-workload-sli-killswitch`, not yet pushed)
+| Item | Status |
+|---|---|
+| Local-only default (`DITTO_BASE_URL`) | Built |
+| Image pins (`deploy/image-pins.env`, Ditto 3.9.8) | Built: pinned Compose in `deploy/ditto/`, stack healthy on the Windows host (branch `feat/m0-deploy-pins`) |
+| Secrets from env | Built |
+| Write + search SLIs | Built, tested against a fake Ditto only |
+| Freshness SLI | Poll-based proxy; SSE pending |
+| Kill switch | Pure logic, tested; not wired to a runner |
+| Max duration check | Built; rollback pending |
+| Container restart experiment | Pending (M4) |
+| Diagnosis, resilience score, evidence report | Pending (planner exists) |
+| `health_check`, `reset`, `simulator/smoke_test.py` (all with `--help`) | Built, verified on the live stack (smoke test 5/5) |
+| `dependency_map.json` | Pending |
+| Tests | 28 run; only `test_api` errors (missing `fastapi`; add to requirements) |
+
+**Verified on the live 3.9.8 stack (2026-10-10, `simulator/smoke_test.py`):** the Ditto v2 API
+paths (`/api/2/policies`, `/api/2/things`, `/api/2/search/things`), the policy body with the
+`nginx:ditto` subject, and the `mongo:7.0.14` tag. Use `127.0.0.1` rather than `localhost`
+in `DITTO_BASE_URL`: on Windows `localhost` tries IPv6 `::1` first (+2 s per connection).
+
+## Milestones
+| Milestone | Content | When |
 |---|---|---|
-| 1 | Ditto deployment + discovery agent | Verified service inventory from the actual deployment |
-| 2 | Topology agent, schemas/API contracts, dashboard | Versioned architecture map behind stable interfaces |
-| 3 | Telemetry agent, baselines, fleet workload + probes | Reliable baseline and experiment measurements |
-| 4 | Planner + diagnosis agents, LLM explanations | Planner that explains its choices; diagnosis that explains outcomes |
-| 5 | Safety controller, chaos runner, evaluation | Safe, recovery-tested execution path |
+| M0 | Add pinned Compose file; stack healthy on the Windows host; run README commands; verify API paths, policy subject, Mongo tag; install `fastapi`; all tests green | Day 1 morning |
+| M1 | Discovery + graph from the real manifests; `dependency_map.json` | Day 1 midday |
+| M2 | Bootstrap + workload live; baseline (120 s minimum, 10 min preferred) with full coverage; SSE freshness replaces the poll proxy | Day 1 afternoon |
+| M3 | Kill switch wired to the runner in dry-run; rollback implemented; forbidden-action tests pass; then lift the 503 | Day 1 late afternoon |
+| M4 | One real `things-search` restart/stop with rollback and max duration, plus a forced abort proving the kill switch | **Day 1 evening (brief's Day-1 minimum)** |
+| M5 | 3+ fault types; predicted vs observed; ranked findings with fixes | Day 2 morning |
+| M6 | Resilience score, report, README demo, architecture page, video, team form, submit 30 min early | Day 2 afternoon |
 
-Boundaries: discovery owns factual service records; topology owns edge semantics; telemetry
-provides normalized observations; planning consumes graph IDs, metric references and
-history; only Person 5's runner executes anything.
-
-## Shared data contracts
-- All records are versioned (`schema_version`) JSON validated against `schemas/`.
-- Metric observations: JSON Lines in `data/metrics/`, ISO-8601 UTC timestamps, e.g.
-  `{"ts": "...", "sli": "write", "target": "bosch.fleet:vehicle-07", "ok": true, "status": 204, "latency_ms": 42}`
-- Experiment plan (immutable once approved):
-  `{"id", "target", "fault", "params", "rollback", "max_duration_s", "abort_thresholds",
-    "predicted_impact": {"sli": ...}, "reason", "approved_by", "approved_at"}`
-- Experiment result: start/stop/rollback times, abort reason (if any), observed impact per
-  SLI, recovery time, evidence references.
-- Schema changes are additive and backward-compatible; breaking changes need a version bump
-  and a migration note.
-
-## Milestones (mapped to the brief)
-| Milestone | Content | Brief checkpoint |
-|---|---|---|
-| M0 | Each person verifies Git, Python, Node, Docker, ports; Ditto pinned and healthy; smoke test passes | Day 1: setup and app selection |
-| M1 | Discovery inventory + versioned dependency graph | Day 1: application mapping |
-| M2 | Fleet workload running; healthy baseline with full metric coverage | Day 1: monitoring baseline |
-| M3 | Planner proposes a safe experiment; safety controller rejects unsafe proposals | Day 1: safety controls |
-| M4 | One short, approved, isolated experiment (stop `things-search` 60 s) + kill switch proven by forced abort | Day 1 minimum |
-| M5 | 3+ fault types run; diagnosis compares predicted vs actual; ranked findings + fixes | Day 2: experiments, analysis |
-| M6 | Resilience score, dashboard, README, architecture page, findings report, demo video | Day 2: polish + submission |
-
-M0–M4 must be done by the Day-1 checkpoint. If Ditto is not healthy with the workload
-running by 13:00 on Day 1, fall back to OWASP crAPI (only deployment, workload and
-service names change).
-
-## Known blockers to resolve in M0
-- Docker unavailable in the current implementation environment: run Ditto on a teammate's
-  laptop with Docker (16 GB+ RAM preferred) and point others at it via `DITTO_URL`.
-- Local Prometheus-backed baseline not yet available: add Prometheus (and cAdvisor for
-  container metrics) to the compose stack, or use the probe SLIs until it works.
-- No Git remote / GitHub CLI: create the team repo and add the remote before branching.
+If the stack is not healthy with the workload running by 13:00 on Day 1, fall back to
+OWASP crAPI (only deployment, workload and service names change).
 
 ## Working conventions
-- Python 3.11+, minimal dependencies; Node only for the dashboard.
-- One branch per person; pull requests into `main`; merge at each checkpoint.
-- Small, working increments; verify each step actually runs before moving on.
-- Tests for: malformed/missing manifests (discovery), schema validation, and end-to-end
-  proof that forbidden targets and actions are rejected (safety).
-- Every script has `--help` and sensible defaults.
-- Keep `README.md` (setup + run steps) and `TOOLS.md` current; both feed graded deliverables.
+- Windows host: run shell scripts via WSL2 or Git Bash, or provide PowerShell equivalents.
+- Python 3.11+; requirements must include `fastapi` and everything the tests import.
+- One branch per person; PRs into `main`; P1 merges at checkpoints.
+- Small, working increments; verify against the live stack before claiming "done".
+- Tests for: SLI math, missing samples, kill-switch thresholds, malformed manifests,
+  schema validation, and forbidden targets/actions being rejected.
+- Every script has `--help`; every metric goes to `data/metrics/*.jsonl`.
+- Keep `README.md` and `TOOLS.md` current; both feed graded deliverables.
 
 ## Final deliverables (Day 2)
 1. Source code: public repo + README (setup and run)

@@ -9,7 +9,8 @@
 #
 # SPDX-License-Identifier: EPL-2.0
 # Adapted from eclipse-ditto/ditto deployment/docker (EPL-2.0) for this project:
-#  - all image tags pinned (DITTO_VERSION default 3.9.8, mongo 7.0.14, nginx 1.27.2-alpine)
+#  - all image tags pinned via ../image-pins.env (Ditto 3.9.8, mongo 7.0.14, nginx 1.27.2-alpine);
+#    run with: docker compose --env-file deploy/image-pins.env -f deploy/ditto/docker-compose.yml ...
 #  - host ports bound to 127.0.0.1 only (localhost-only rule)
 #  - nginx static assets (images, wot) vendored into ./assets so the folder is self-contained
 #  - swagger-ui service and /apidoc route removed (not needed; upstream doc files tripped gitleaks)
@@ -20,7 +21,7 @@ version: '3.4'
 
 services:
   mongodb:
-    image: docker.io/mongo:7.0.14
+    image: docker.io/mongo:${MONGO_VERSION:-7.0.14}
     deploy:
       resources:
         limits:
@@ -236,7 +237,7 @@ services:
         max-size: 10m
         
   nginx:
-    image: docker.io/nginx:1.27.2-alpine
+    image: docker.io/nginx:${NGINX_VERSION:-1.27.2-alpine}
     deploy:
       resources:
         limits:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data"
 METRICS_DIR = DATA_DIR / "metrics"
 
@@ -30,12 +30,13 @@ def _load_dotenv(path: Path) -> None:
 
 _load_dotenv(REPO_ROOT / ".env")
 
-DITTO_URL = (os.environ.get("DITTO_URL") or os.environ.get("DITTO_BASE_URL")
-             or "http://127.0.0.1:8080").rstrip("/")
+# Loopback by default. 127.0.0.1 rather than "localhost": on Windows "localhost" tries IPv6 ::1
+# first and the stack only listens on IPv4, adding ~2 s to every new connection.
+DITTO_BASE_URL = os.environ.get("DITTO_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
 DITTO_USER = os.environ.get("DITTO_USER", "ditto")
 DITTO_PASS = os.environ.get("DITTO_PASS", "ditto")
 AUTH = (DITTO_USER, DITTO_PASS)
-API = f"{DITTO_URL}/api/2"
+API = f"{DITTO_BASE_URL}/api/2"
 
 
 def policy_body(user: str = DITTO_USER) -> dict:

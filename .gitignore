@@ -4,8 +4,6 @@ vendor/
 .env
 .env.*
 !.env.example
-# Compose config (version pins only, no secrets) must be committed
-!deploy/ditto/.env
 
 # Python
 .venv/

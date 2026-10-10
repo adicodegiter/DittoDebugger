@@ -16,7 +16,7 @@ Options:
   -h, --help      Show this help
 
 Environment (read from the shell or the repo-root .env):
-  DITTO_URL   default http://127.0.0.1:8080
+  DITTO_BASE_URL default http://127.0.0.1:8080
   DITTO_USER  default ditto
   DITTO_PASS  default ditto
 EOF
@@ -35,7 +35,7 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-COMPOSE_DIR="$SCRIPT_DIR/ditto"
+COMPOSE=(docker compose --env-file "$SCRIPT_DIR/image-pins.env" -f "$SCRIPT_DIR/ditto/docker-compose.yml")
 
 # Load repo-root .env if present (does not override variables already set).
 if [[ -f "$REPO_ROOT/.env" ]]; then
@@ -45,14 +45,14 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
     [[ -z "${!k:-}" ]] && export "$k=$v"
   done < "$REPO_ROOT/.env"
 fi
-DITTO_URL="${DITTO_URL:-http://127.0.0.1:8080}"
+DITTO_BASE_URL="${DITTO_BASE_URL:-http://127.0.0.1:8080}"
 DITTO_USER="${DITTO_USER:-ditto}"
 DITTO_PASS="${DITTO_PASS:-ditto}"
 
 check_once() {
   local all_ok=0
   local ids
-  ids="$(docker compose --project-directory "$COMPOSE_DIR" ps -a -q 2>/dev/null)"
+  ids="$("${COMPOSE[@]}" ps -a -q 2>/dev/null)"
   if [[ -z "$ids" ]]; then
     [[ $QUIET -eq 0 ]] && echo "No Ditto containers found (is the stack up? see deploy/reset.sh)"
     return 1
@@ -74,12 +74,12 @@ check_once() {
 
   # API checks: unauthenticated health endpoint + an authenticated search request.
   local h s
-  h="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$DITTO_URL/health")"
+  h="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$DITTO_BASE_URL/health")"
   s="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -u "$DITTO_USER:$DITTO_PASS" \
-        "$DITTO_URL/api/2/search/things?option=size(1)")"
+        "$DITTO_BASE_URL/api/2/search/things?option=size(1)")"
   local api=OK
   [[ "$h" != 200 || "$s" != 200 ]] && api=FAIL && all_ok=1
-  [[ $QUIET -eq 0 ]] && echo "API $DITTO_URL  /health=$h  /api/2/search=$s  -> $api"
+  [[ $QUIET -eq 0 ]] && echo "API $DITTO_BASE_URL  /health=$h  /api/2/search=$s  -> $api"
   return $all_ok
 }
 

@@ -18,7 +18,7 @@ Options:
   --wait SECONDS  How long to wait for the stack to become healthy (default: 300)
   -h, --help      Show this help
 
-Only affects containers/volumes of the 'ditto' compose project in deploy/ditto.
+Only affects containers/volumes of the 'ditto' compose project (deploy/ditto, pins from deploy/image-pins.env).
 EOF
 }
 
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE=(docker compose --project-directory "$SCRIPT_DIR/ditto")
+COMPOSE=(docker compose --env-file "$SCRIPT_DIR/image-pins.env" -f "$SCRIPT_DIR/ditto/docker-compose.yml")
 
 if [[ $WIPE -eq 1 ]]; then
   echo "WARNING: --wipe-data will DELETE the MongoDB volume (all things, policies, search index)."
@@ -54,7 +54,8 @@ else
   "${COMPOSE[@]}" down --remove-orphans
 fi
 
-echo "[reset] Starting stack..."
+echo "[reset] Pulling pinned images and starting stack..."
+"${COMPOSE[@]}" pull --quiet
 "${COMPOSE[@]}" up -d
 
 echo "[reset] Waiting up to ${WAIT}s for all services to be healthy..."
